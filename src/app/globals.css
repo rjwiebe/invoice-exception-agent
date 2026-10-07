@@ -114,6 +114,8 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); 
   .page-head > div:last-child { text-align: left !important; }
   .stats { gap: 10px; }
   .stat .n { font-size: 23px; }
+  .tabs { max-width: 100%; overflow-x: auto; white-space: nowrap; padding-bottom: 2px; }
+  .tab { flex: 0 0 auto; }
   .card { padding: 14px; }
   .card:has(> table) { padding: 0 !important; }
   .two { grid-template-columns: minmax(0, 1fr); }
