@@ -4,6 +4,11 @@ An end-to-end accounts-payable workflow demo: invoices are extracted, checked ag
 
 This is intentionally a small product slice—not a chatbot, payment system, or SaaS platform. It runs locally with synthetic data and a deterministic mock AI provider; no API key or external service is required.
 
+## Project links
+
+- **Source:** [github.com/roger-neon/invoice-exception-agent](https://github.com/roger-neon/invoice-exception-agent)
+- **Live demo:** Not deployed yet. Railway setup is pending account authorization.
+
 ## The problem and the user
 
 AP teams receive invoices in inconsistent formats. Matching each one by hand is repetitive, while mistakes such as duplicate invoices, unapproved price changes, PO overruns, and changed bank details can delay work or create payment risk.
