@@ -3,6 +3,8 @@ import { StatusBadge } from "@/components/Badges";
 import { ResetButton } from "@/components/ResetButton";
 import { dateTime, money } from "@/lib/format";
 import { getVendors, listInvoices } from "@/lib/repo";
+import { currentDemoSessionId } from "@/lib/session";
+import { ensureDemoSession } from "@/lib/seed";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +12,9 @@ const TABS = [["", "All"], ["needs_review", "Needs review"], ["cleared", "Cleare
 
 export default async function Inbox({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const { status } = await searchParams;
-  const all = listInvoices();
+  const sessionId = await currentDemoSessionId();
+  await ensureDemoSession(sessionId);
+  const all = listInvoices(sessionId);
   const vendorNames = new Map(getVendors().map((vendor) => [vendor.id, vendor.name] as const));
   const rows = status ? all.filter((i) => i.status === status) : all;
   const count = (s: string) => all.filter((i) => i.status === s).length;

@@ -1,8 +1,9 @@
 import { getDb } from "./db";
-import { mockProvider } from "./ai/provider";
 import { appendAudit } from "./audit";
+import { mockProvider } from "./ai/provider";
 import { submitInvoice } from "./pipeline";
 import { HISTORY, renderInvoice, SCENARIOS } from "./samples";
+import { isValidDemoSessionId } from "./session-id";
 
 const VENDORS = [
   ["V-001", "Northwind Industrial Supply Co.", ["Northwind Industrial", "Northwind Industrial Supply"], "active", "4417", "Net 30"],
@@ -23,32 +24,128 @@ const POS: [string, string, string, string, [string, string, number, number][]][
   ["PO-10027", "V-006", "open", "2026-06-15", [["PKG-BX", "Shipping carton", 5000, 1.15]]],
 ];
 
-export function resetData() {
+const sessionTasks = new Map<string, Promise<unknown>>();
+const now = () => new Date().toISOString();
+
+function withSessionLock<T>(sessionId: string, work: () => Promise<T>): Promise<T> {
+  const previous = sessionTasks.get(sessionId) ?? Promise.resolve();
+  const task = previous.catch(() => undefined).then(work);
+  sessionTasks.set(sessionId, task);
+  return task.finally(() => {
+    if (sessionTasks.get(sessionId) === task) sessionTasks.delete(sessionId);
+  });
+}
+
+function assertSessionId(sessionId: string): void {
+  if (!isValidDemoSessionId(sessionId)) throw new Error("A valid demo session ID is required");
+}
+
+function ensureSessionRow(sessionId: string): void {
+  const ts = now();
+  getDb()
+    .prepare("INSERT OR IGNORE INTO demo_sessions (session_id, reviewer_id, seeded_at, created_at, updated_at) VALUES (?, 'sam', NULL, ?, ?)")
+    .run(sessionId, ts, ts);
+}
+
+function deleteSessionRecords(sessionId: string): void {
+  const db = getDb();
+  db.prepare("DELETE FROM reviews WHERE session_id = ?").run(sessionId);
+  db.prepare("DELETE FROM audit_log WHERE session_id = ?").run(sessionId);
+  db.prepare("DELETE FROM invoices WHERE session_id = ?").run(sessionId);
+}
+
+async function populateSession(sessionId: string, action: "demo.session_initialized" | "demo.session_reset"): Promise<void> {
+  appendAudit(sessionId, {
+    invoiceId: null,
+    actorType: "system",
+    actor: "demo-session",
+    action,
+    summary: action === "demo.session_reset"
+      ? "This browser session's synthetic demo data was reset."
+      : "Synthetic demo data initialized for this browser session.",
+  });
+  for (const invoice of HISTORY) {
+    await submitInvoice(sessionId, renderInvoice(invoice), "synthetic demo history", mockProvider);
+  }
+  const starterReview = SCENARIOS.find((scenario) => scenario.id === "price");
+  if (!starterReview) throw new Error("The seeded price-variance scenario is missing");
+  await submitInvoice(sessionId, starterReview.text, "synthetic demo fixture", mockProvider);
+}
+
+async function initializeSession(sessionId: string): Promise<void> {
+  seedReferenceData();
+  ensureSessionRow(sessionId);
+  const row = getDb().prepare("SELECT seeded_at FROM demo_sessions WHERE session_id = ?").get(sessionId) as { seeded_at: string | null };
+  if (row.seeded_at) return;
+
+  const db = getDb();
+  db.transaction(() => deleteSessionRecords(sessionId))();
+  try {
+    await populateSession(sessionId, "demo.session_initialized");
+    db.prepare("UPDATE demo_sessions SET seeded_at = ?, updated_at = ? WHERE session_id = ?").run(now(), now(), sessionId);
+  } catch (error) {
+    db.transaction(() => {
+      deleteSessionRecords(sessionId);
+      db.prepare("UPDATE demo_sessions SET reviewer_id = 'sam', seeded_at = NULL, updated_at = ? WHERE session_id = ?").run(now(), sessionId);
+    })();
+    throw error;
+  }
+}
+
+export function seedReferenceData(): void {
   const db = getDb();
   const addVendor = db.prepare("INSERT INTO vendors VALUES (?,?,?,?,?,?)");
   const addPo = db.prepare("INSERT INTO purchase_orders VALUES (?,?,?,?,?)");
   const addLine = db.prepare("INSERT INTO po_lines (po_number, sku, description, quantity, unit_price) VALUES (?,?,?,?,?)");
   db.transaction(() => {
-    for (const t of ["audit_log", "reviews", "invoices", "po_lines", "purchase_orders", "vendors"]) db.exec(`DELETE FROM ${t}`);
-    db.exec("DELETE FROM sqlite_sequence");
-    for (const v of VENDORS) addVendor.run(v[0], v[1], JSON.stringify(v[2]), v[3], v[4], v[5]);
-    for (const [num, vendor, status, issued, lines] of POS) {
-      addPo.run(num, vendor, status, "USD", issued);
-      for (const l of lines) addLine.run(num, ...l);
+    const count = (db.prepare("SELECT COUNT(*) AS n FROM vendors").get() as { n: number }).n;
+    if (count > 0) return;
+    for (const vendor of VENDORS) addVendor.run(vendor[0], vendor[1], JSON.stringify(vendor[2]), vendor[3], vendor[4], vendor[5]);
+    for (const [number, vendor, status, issued, lines] of POS) {
+      addPo.run(number, vendor, status, "USD", issued);
+      for (const line of lines) addLine.run(number, ...line);
     }
   })();
 }
 
-export async function seedDemo() {
-  resetData();
-  appendAudit({ invoiceId: null, actorType: "system", actor: "seed", action: "system.seeded", summary: "Demo reference data loaded (6 vendors, 7 purchase orders)" });
-  // History goes through the real pipeline with the mock provider, so its audit trail is genuine.
-  for (const h of HISTORY) await submitInvoice(renderInvoice(h), "email", mockProvider);
-  const starterReview = SCENARIOS.find((scenario) => scenario.id === "price");
-  if (!starterReview) throw new Error("The seeded price-variance scenario is missing");
-  await submitInvoice(starterReview.text, "email", mockProvider);
+export function ensureDemoSession(sessionId: string): Promise<void> {
+  assertSessionId(sessionId);
+  return withSessionLock(sessionId, () => initializeSession(sessionId));
 }
 
-export function isEmpty() {
-  return (getDb().prepare("SELECT COUNT(*) AS n FROM vendors").get() as { n: number }).n === 0;
+export function resetDemoSession(sessionId: string): Promise<void> {
+  assertSessionId(sessionId);
+  return withSessionLock(sessionId, async () => {
+    seedReferenceData();
+    ensureSessionRow(sessionId);
+    const db = getDb();
+    db.transaction(() => {
+      deleteSessionRecords(sessionId);
+      db.prepare("UPDATE demo_sessions SET reviewer_id = 'sam', seeded_at = NULL, updated_at = ? WHERE session_id = ?").run(now(), sessionId);
+    })();
+    try {
+      await populateSession(sessionId, "demo.session_reset");
+      db.prepare("UPDATE demo_sessions SET seeded_at = ?, updated_at = ? WHERE session_id = ?").run(now(), now(), sessionId);
+    } catch (error) {
+      db.transaction(() => {
+        deleteSessionRecords(sessionId);
+        db.prepare("UPDATE demo_sessions SET seeded_at = NULL, updated_at = ? WHERE session_id = ?").run(now(), sessionId);
+      })();
+      throw error;
+    }
+  });
+}
+
+export function resetLocalDemoData(): void {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("The global demo reset is disabled in production");
+  }
+  const db = getDb();
+  db.transaction(() => {
+    for (const table of ["audit_log", "reviews", "invoices", "demo_sessions", "po_lines", "purchase_orders", "vendors"]) {
+      db.exec(`DELETE FROM ${table}`);
+    }
+    db.prepare("UPDATE invoice_id_sequence SET value = 0 WHERE name = 'invoice'").run();
+  })();
+  seedReferenceData();
 }

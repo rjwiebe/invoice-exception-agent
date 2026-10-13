@@ -12,7 +12,7 @@ export function ResetButton() {
         className="btn"
         disabled={busy}
         onClick={async () => {
-          if (!confirm("Reset all demo data, including the audit log?")) return;
+          if (!confirm("Reset only this browser session's demo data and audit history? Other visitors will not be affected.")) return;
           setBusy(true);
           setError(null);
           try {
@@ -27,7 +27,7 @@ export function ResetButton() {
           }
         }}
       >
-        {busy ? "Resetting…" : "Reset demo data"}
+        {busy ? "Resetting…" : "Reset my demo session"}
       </button>
       {error && <div className="err" role="alert">{error}</div>}
     </div>

@@ -1,25 +1,33 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { ensureDemoSession } from "@/lib/seed";
+import { missingSessionResponse, requestSessionId } from "@/lib/api-session";
 import { PipelineError, submitInvoice } from "@/lib/pipeline";
 import { listInvoices } from "@/lib/repo";
+import { SCENARIOS } from "@/lib/samples";
 
 export const dynamic = "force-dynamic";
 
-export function GET(req: Request) {
+export async function GET(req: Request) {
+  const sessionId = requestSessionId(req);
+  if (!sessionId) return missingSessionResponse();
+  await ensureDemoSession(sessionId);
   const status = new URL(req.url).searchParams.get("status") ?? undefined;
-  return NextResponse.json(listInvoices(status));
+  return NextResponse.json(listInvoices(sessionId, status));
 }
 
-const Body = z.object({
-  rawText: z.string().trim().min(20, "Paste the invoice text (at least 20 characters)").max(20_000, "Invoice text must be 20,000 characters or fewer"),
-  source: z.string().max(100).default("manual upload"),
-});
+const Body = z.object({ scenarioId: z.string().trim().min(1).max(50) }).strict();
 
 export async function POST(req: Request) {
+  const sessionId = requestSessionId(req);
+  if (!sessionId) return missingSessionResponse();
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+  const scenario = SCENARIOS.find((item) => item.id === parsed.data.scenarioId);
+  if (!scenario) return NextResponse.json({ error: "Choose one of the synthetic demo scenarios." }, { status: 400 });
   try {
-    return NextResponse.json(await submitInvoice(parsed.data.rawText, parsed.data.source), { status: 201 });
+    await ensureDemoSession(sessionId);
+    return NextResponse.json(await submitInvoice(sessionId, scenario.text, "synthetic demo scenario"), { status: 201 });
   } catch (e) {
     if (e instanceof PipelineError) return NextResponse.json({ error: e.message }, { status: e.status });
     console.error("Invoice submission failed", e);

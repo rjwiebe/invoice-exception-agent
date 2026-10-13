@@ -33,21 +33,21 @@ const toInvoice = (r: Row): Invoice => ({
   createdAt: r.created_at!, updatedAt: r.updated_at!,
 });
 
-export function getInvoice(id: string): Invoice | null {
-  const r = getDb().prepare("SELECT * FROM invoices WHERE id = ?").get(id) as Row | undefined;
+export function getInvoice(id: string, sessionId: string): Invoice | null {
+  const r = getDb().prepare("SELECT * FROM invoices WHERE id = ? AND session_id = ?").get(id, sessionId) as Row | undefined;
   return r ? toInvoice(r) : null;
 }
 
-export function listInvoices(status?: string): Invoice[] {
+export function listInvoices(sessionId: string, status?: string): Invoice[] {
   const db = getDb();
   const rows = (status
-    ? db.prepare("SELECT * FROM invoices WHERE status = ? ORDER BY created_at DESC").all(status)
-    : db.prepare("SELECT * FROM invoices ORDER BY created_at DESC").all()) as Row[];
+    ? db.prepare("SELECT * FROM invoices WHERE session_id = ? AND status = ? ORDER BY created_at DESC").all(sessionId, status)
+    : db.prepare("SELECT * FROM invoices WHERE session_id = ? ORDER BY created_at DESC").all(sessionId)) as Row[];
   return rows.map(toInvoice);
 }
 
-export function priorInvoices(excludeId: string): PriorInvoice[] {
-  return listInvoices()
+export function priorInvoices(sessionId: string, excludeId: string): PriorInvoice[] {
+  return listInvoices(sessionId)
     .filter((i) => i.id !== excludeId && i.status !== "processing")
     .map((i) => ({
       id: i.id, vendorId: i.vendorId, invoiceNumber: i.extracted?.invoiceNumber ?? null,
@@ -58,6 +58,9 @@ export function priorInvoices(excludeId: string): PriorInvoice[] {
 }
 
 export function newInvoiceId(): string {
-  const n = (getDb().prepare("SELECT COUNT(*) AS n FROM invoices").get() as { n: number }).n;
-  return `INV-${String(n + 1).padStart(4, "0")}`;
+  const row = getDb()
+    .prepare("UPDATE invoice_id_sequence SET value = value + 1 WHERE name = 'invoice' RETURNING value")
+    .get() as { value: number } | undefined;
+  if (!row) throw new Error("Invoice ID sequence is not initialized");
+  return `INV-${String(row.value).padStart(4, "0")}`;
 }

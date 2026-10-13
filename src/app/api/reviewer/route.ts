@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
-import { REVIEWERS } from "@/lib/users";
+import { z } from "zod";
+import { missingSessionResponse, requestSessionId } from "@/lib/api-session";
+import { changeReviewer, REVIEWERS } from "@/lib/users";
+import { ensureDemoSession } from "@/lib/seed";
+
+const Body = z.object({ id: z.string().trim().min(1).max(30) }).strict();
 
 export async function POST(req: Request) {
-  const { id } = (await req.json().catch(() => ({}))) as { id?: string };
-  if (!REVIEWERS.some((r) => r.id === id)) return NextResponse.json({ error: "Unknown reviewer" }, { status: 400 });
-  const res = NextResponse.json({ ok: true });
-  res.cookies.set("reviewer", id!, { path: "/", httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production" });
-  return res;
+  const sessionId = requestSessionId(req);
+  if (!sessionId) return missingSessionResponse();
+  const parsed = Body.safeParse(await req.json().catch(() => null));
+  if (!parsed.success || !REVIEWERS.some((r) => r.id === parsed.data.id)) {
+    return NextResponse.json({ error: "Choose a known demo persona." }, { status: 400 });
+  }
+  await ensureDemoSession(sessionId);
+  return NextResponse.json({ reviewer: changeReviewer(sessionId, parsed.data.id) });
 }

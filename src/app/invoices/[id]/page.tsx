@@ -7,21 +7,25 @@ import { listAudit } from "@/lib/audit";
 import { dateTime, money } from "@/lib/format";
 import { MANAGER_APPROVAL_THRESHOLD } from "@/lib/pipeline";
 import { getInvoice, getVendors } from "@/lib/repo";
+import { currentDemoSessionId } from "@/lib/session";
 import { currentReviewer } from "@/lib/users";
+import { ensureDemoSession } from "@/lib/seed";
 
 export const dynamic = "force-dynamic";
 const ICON = { pass: "✓", fail: "✕", warning: "!", skipped: "–" } as const;
 
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const inv = getInvoice(id);
+  const sessionId = await currentDemoSessionId();
+  await ensureDemoSession(sessionId);
+  const inv = getInvoice(id, sessionId);
   if (!inv) notFound();
-  const me = await currentReviewer();
+  const me = currentReviewer(sessionId);
   const x = inv.extracted;
   const vendorName = inv.vendorId
     ? getVendors().find((vendor) => vendor.id === inv.vendorId)?.name ?? x?.vendorName
     : x?.vendorName;
-  const audit = listAudit(id);
+  const audit = listAudit(sessionId, id);
   const flagged = new Set(inv.checks.flatMap((c) => c.findings.map((f) => f.field).filter(Boolean)));
   const passed = inv.checks.filter((c) => c.status === "pass").length;
   const ran = inv.checks.filter((c) => c.status !== "skipped").length;

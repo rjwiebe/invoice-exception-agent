@@ -7,7 +7,7 @@ export default function NewInvoice() {
       <div className="page-head">
         <div>
           <h1>Submit an invoice</h1>
-          <div className="sub">Choose a scenario or paste your own text. The agent extracts, checks, and either clears it or routes it to a human.</div>
+          <div className="sub">Choose a synthetic scenario. The agent extracts, checks, and either clears it or routes it to a human.</div>
         </div>
       </div>
       <NewInvoiceForm scenarios={SCENARIOS} />

@@ -1,11 +1,15 @@
 import { AuditTimeline } from "@/components/AuditTimeline";
 import { listAudit, verifyAuditChain } from "@/lib/audit";
+import { currentDemoSessionId } from "@/lib/session";
+import { ensureDemoSession } from "@/lib/seed";
 
 export const dynamic = "force-dynamic";
 
-export default function AuditPage() {
-  const v = verifyAuditChain();
-  const entries = listAudit(undefined, 200);
+export default async function AuditPage() {
+  const sessionId = await currentDemoSessionId();
+  await ensureDemoSession(sessionId);
+  const v = verifyAuditChain(sessionId);
+  const entries = listAudit(sessionId, undefined, 200);
   return (
     <>
       <div className="page-head">

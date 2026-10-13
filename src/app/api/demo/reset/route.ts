@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
-import { seedDemo } from "@/lib/seed";
+import { missingSessionResponse, requestSessionId } from "@/lib/api-session";
+import { resetDemoSession } from "@/lib/seed";
 
-export async function POST() {
+export async function POST(req: Request) {
+  const sessionId = requestSessionId(req);
+  if (!sessionId) return missingSessionResponse();
   try {
-    await seedDemo();
+    await resetDemoSession(sessionId);
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Demo reset failed", error);

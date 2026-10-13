@@ -8,7 +8,7 @@ export function ReviewerSwitcher({ reviewers, currentId }: { reviewers: Reviewer
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   return (
-    <div className="who" title="Demo persona only—not authentication. Switch roles to see the approval policy.">
+    <div className="who" title="These roles are simulated within this browser session. They are not real user authentication.">
       <select
         value={currentId}
         disabled={busy}
@@ -32,7 +32,7 @@ export function ReviewerSwitcher({ reviewers, currentId }: { reviewers: Reviewer
         }}
       >
         {reviewers.map((r) => (
-          <option key={r.id} value={r.id}>{r.name} · {r.title}</option>
+          <option key={r.id} value={r.id}>{r.name} · {r.title} (demo)</option>
         ))}
       </select>
       {error && <span className="who-error" role="alert">{error}</span>}

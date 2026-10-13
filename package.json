@@ -3,12 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "predev": "tsx scripts/seed.ts --if-empty",
-    "prestart": "tsx scripts/seed.ts --if-empty",
+    "predev": "tsx scripts/seed.ts --init",
+    "prestart": "tsx scripts/seed.ts --init",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "seed": "tsx scripts/seed.ts --reset",
+    "seed": "tsx scripts/seed.ts --reset-local",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
