@@ -6,7 +6,7 @@ This is intentionally a small product slice—not a chatbot, payment system, or 
 
 ## Project links
 
-- **Source:** [github.com/roger-neon/invoice-exception-agent](https://github.com/roger-neon/invoice-exception-agent)
+- **Source:** [github.com/rjwiebe/invoice-exception-agent](https://github.com/rjwiebe/invoice-exception-agent)
 - **Live demo:** Not deployed yet. Railway setup is pending account authorization.
 
 ## The problem and the user
