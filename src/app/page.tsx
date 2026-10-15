@@ -8,7 +8,7 @@ import { ensureDemoSession } from "@/lib/seed";
 
 export const dynamic = "force-dynamic";
 
-const TABS = [["", "All"], ["needs_review", "Needs review"], ["cleared", "Cleared"], ["approved", "Approved"], ["rejected", "Rejected"]];
+const TABS = [["", "All"], ["needs_review", "Needs review"], ["cleared", "Cleared for payment"], ["approved", "Approved"], ["rejected", "Rejected"]];
 
 export default async function Inbox({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const { status } = await searchParams;
@@ -28,14 +28,14 @@ export default async function Inbox({ searchParams }: { searchParams: Promise<{ 
       <div className="page-head">
         <div>
           <h1>Invoice inbox</h1>
-          <div className="sub">Clean invoices clear themselves. Everything else waits here for a human.</div>
+          <div className="sub">Clean invoices are cleared for payment. Exceptions wait here for a human.</div>
         </div>
         <Link href="/new" className="btn primary">Submit an invoice</Link>
       </div>
       <div className="grid stats">
         <div className="card stat"><div className="n">{count("needs_review")}</div><div className="l">Waiting for review</div></div>
         <div className="card stat"><div className="n">{money(held)}</div><div className="l">Value on hold</div></div>
-        <div className="card stat"><div className="n">{count("cleared")}</div><div className="l">Cleared</div></div>
+        <div className="card stat"><div className="n">{count("cleared")}</div><div className="l">Cleared for payment</div></div>
         <div className="card stat"><div className="n">{autoRate}%</div><div className="l">Cleared without a human</div></div>
       </div>
       <div className="tabs">

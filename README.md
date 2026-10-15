@@ -1,6 +1,6 @@
 # Invoice Exception Agent
 
-An end-to-end accounts-payable workflow demo: invoices are extracted, checked against vendor and purchase-order records, and either cleared automatically or sent to a person with a clear explanation and a recorded decision.
+An end-to-end accounts-payable workflow demo: invoices are extracted, checked against vendor and purchase-order records, and either cleared for payment automatically or sent to a person with a clear explanation and a recorded decision.
 
 This is intentionally a small product slice—not a chatbot, payment system, or SaaS platform. It runs locally with synthetic data and a deterministic mock AI provider; no API key or external service is required.
 
@@ -97,7 +97,7 @@ There is one Next.js application and one SQLite database—no microservices, ext
 
 - [`src/lib/pipeline.ts`](src/lib/pipeline.ts) orchestrates intake, provider calls, validation, rules, routing, and reviewer decisions.
 - [`src/lib/ai/provider.ts`](src/lib/ai/provider.ts) defines the provider boundary. The pipeline validates the provider's `unknown` response before using it.
-- [`src/lib/rules.ts`](src/lib/rules.ts) is a pure deterministic evaluator. It returns structured findings with codes, severity, and expected/actual values.
+- [`src/lib/rules.ts`](src/lib/rules.ts) is a pure deterministic evaluator. It returns structured findings with codes, severity, and expected/actual values. When a price variance is exactly the cause of a PO-balance overrun, the balance finding is linked as supporting evidence rather than presented as a second independent exception; both checks remain visible.
 - [`src/lib/db.ts`](src/lib/db.ts) creates the SQLite schema; [`src/lib/repo.ts`](src/lib/repo.ts) maps rows to domain types.
 - [`src/lib/audit.ts`](src/lib/audit.ts) appends events and verifies the hash chain.
 - [`src/lib/seed.ts`](src/lib/seed.ts) idempotently initializes synthetic vendors/POs and seeds a visitor's starter invoices through the same pipeline used at runtime. A reset operates only on the caller's session.

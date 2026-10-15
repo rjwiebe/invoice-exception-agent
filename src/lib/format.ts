@@ -8,7 +8,7 @@ export const dateTime = (iso: string) =>
 
 export const STATUS_LABEL: Record<string, string> = {
   processing: "Processing",
-  cleared: "Cleared",
+  cleared: "Cleared for payment",
   needs_review: "Needs review",
   approved: "Approved (override)",
   rejected: "Rejected",

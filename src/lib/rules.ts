@@ -3,7 +3,7 @@ import type { Check, Extracted, Finding, PriorInvoice, PurchaseOrder, Severity, 
 
 // Pure and deterministic: same input, same output. No database, no AI, no clock.
 // Every business decision about an invoice lives here so it can be unit-tested and audited.
-export const RULESET_VERSION = "rules-v1";
+export const RULESET_VERSION = "rules-v2";
 
 export const POLICY = {
   priceWarnPct: 0.005, // below this, a unit-price difference is rounding noise
@@ -165,6 +165,9 @@ export function evaluateInvoice(inv: Extracted, ctx: RuleContext): Evaluation {
     if (line.quantity > poLine.quantity)
       qtyFindings.push(F("QUANTITY_EXCEEDS_PO", "error", `${poLine.sku}: invoiced ${line.quantity} but the PO only ordered ${poLine.quantity}.`, { expected: String(poLine.quantity), actual: String(line.quantity) }));
   }
+  const unitPriceVariance = round2(
+    matched.reduce((sum, { line, poLine }) => sum + (poLine ? line.quantity * (line.unitPrice - poLine.unitPrice) : 0), 0),
+  );
   add("prices", "Unit prices match PO", priceFindings, !po || inv.lineItems.length === 0);
   add("quantities", "Quantities within PO", qtyFindings, !po || inv.lineItems.length === 0);
 
@@ -179,14 +182,28 @@ export function evaluateInvoice(inv: Extracted, ctx: RuleContext): Evaluation {
     const remaining = round2(poTotal(po) - billed);
     const amount = inv.subtotal ?? linesSum;
     if (amount > remaining + 0.005) {
-      const overrun = (amount - remaining) / Math.max(remaining, 1);
+      const overrunAmount = round2(amount - remaining);
+      const overrun = overrunAmount / Math.max(remaining, 1);
+      const explainedByPriceVariance =
+        priceFindings.length > 0 &&
+        qtyFindings.length === 0 &&
+        matched.length > 0 &&
+        matched.every((match) => match.poLine) &&
+        unitPriceVariance > 0 &&
+        Math.abs(overrunAmount - unitPriceVariance) <= POLICY.mathTolerance;
       const priorBilled = billed > 0 ? `, ${money(billed)} already cleared for payment` : "";
       balanceFindings.push(
         F(
           "OVER_PO_BALANCE",
           overrun > POLICY.balanceTolerancePct ? "error" : "warning",
-          `Invoice is ${money(amount)} before tax but only ${money(remaining)} remains on ${po.number} (${money(poTotal(po))} ordered${priorBilled}).`,
-          { expected: money(remaining), actual: money(amount) },
+          explainedByPriceVariance
+            ? `The same ${money(unitPriceVariance)} unit-price variance is the amount this invoice exceeds the remaining PO balance (${money(amount)} invoiced vs ${money(remaining)} remaining).`
+            : `Invoice is ${money(amount)} before tax but only ${money(remaining)} remains on ${po.number} (${money(poTotal(po))} ordered${priorBilled}).`,
+          {
+            expected: money(remaining),
+            actual: money(amount),
+            ...(explainedByPriceVariance ? { relatedTo: "PRICE_VARIANCE" } : {}),
+          },
         ),
       );
     }

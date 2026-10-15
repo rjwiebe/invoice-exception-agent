@@ -60,9 +60,14 @@ export class MockProvider implements AIProvider {
     const codes = new Set(findings.map((f) => f.code));
     const has = (...c: string[]) => c.some((x) => codes.has(x));
     const who = vendorName ?? invoice.vendorName ?? "an unknown vendor";
-    const count = findings.length;
+    const primaryFindings = findings.filter((finding) => !finding.relatedTo);
+    const supportingFindings = findings.filter((finding) => finding.relatedTo);
+    const count = primaryFindings.length || findings.length;
 
-    const summary = `Invoice ${invoice.invoiceNumber ?? "(number not found)"} from ${who} was held for review because ${count === 1 ? "one check" : `${count} checks`} did not pass. ${findings.map((f) => f.message).join(" ")}`;
+    const summary =
+      `Invoice ${invoice.invoiceNumber ?? "(number not found)"} from ${who} was held for review because ${count === 1 ? "one exception needs" : `${count} exceptions need`} review. ` +
+      `${primaryFindings.map((f) => f.message).join(" ") || findings.map((f) => f.message).join(" ")}` +
+      (supportingFindings.length ? ` Supporting evidence: ${supportingFindings.map((f) => f.message).join(" ")}` : "");
 
     let recommendedAction: RecommendedAction;
     let rationale: string;

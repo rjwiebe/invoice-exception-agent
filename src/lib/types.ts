@@ -49,6 +49,7 @@ export interface Finding {
   field?: string;
   expected?: string;
   actual?: string;
+  relatedTo?: string;
 }
 
 export interface Check {

@@ -13,6 +13,7 @@ import { mockProvider } from "../src/lib/ai/provider";
 import { PipelineError, decide, submitInvoice } from "../src/lib/pipeline";
 import { getInvoice, listInvoices } from "../src/lib/repo";
 import { SCENARIOS } from "../src/lib/samples";
+import { STATUS_LABEL } from "../src/lib/format";
 import { ensureDemoSession, resetLocalDemoData, resetDemoSession } from "../src/lib/seed";
 import { sessionIdFromCookieHeader, DEMO_SESSION_COOKIE } from "../src/lib/session-id";
 import { changeReviewer, currentReviewer, REVIEWERS } from "../src/lib/users";
@@ -138,6 +139,19 @@ describe("seven synthetic scenarios", () => {
     expect(codes(price)).not.toContain("DUPLICATE_INVOICE");
   });
 
+  it("groups the price-driven PO overrun as evidence for one primary exception", async () => {
+    const price = await submit(SESSION_A, "price");
+    const findings = price.checks.flatMap((check) => check.findings);
+    const variance = findings.find((finding) => finding.code === "PRICE_VARIANCE");
+    const balance = findings.find((finding) => finding.code === "OVER_PO_BALANCE");
+
+    expect(variance).toBeDefined();
+    expect(balance?.relatedTo).toBe("PRICE_VARIANCE");
+    expect(price.explanation?.summary).toContain("one exception needs review");
+    expect(price.explanation?.summary).toContain("Supporting evidence");
+    expect(price.explanation?.summary).toContain("$600.00");
+  });
+
   it.each([
     ["price", "PRICE_VARIANCE"],
     ["duplicate", "DUPLICATE_INVOICE"],
@@ -150,6 +164,14 @@ describe("seven synthetic scenarios", () => {
     expect(inv.status).toBe("needs_review");
     expect(codes(inv)).toContain(code);
     expect(inv.explanation?.summary).toBeTruthy();
+    if (id === "overbilled") {
+      const balance = inv.checks.flatMap((check) => check.findings).find((finding) => finding.code === "OVER_PO_BALANCE");
+      expect(balance?.relatedTo).toBeUndefined();
+    }
+  });
+
+  it("labels matched invoices as cleared for payment rather than paid", () => {
+    expect(STATUS_LABEL.cleared).toBe("Cleared for payment");
   });
 
   it("does not guess missing currency", async () => {

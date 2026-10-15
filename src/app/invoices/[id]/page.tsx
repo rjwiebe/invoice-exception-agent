@@ -83,7 +83,12 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                   <span className={`dot ${c.status}`}>{ICON[c.status]}</span>
                   <div>
                     <div className={c.status === "skipped" ? "muted" : ""}>{c.label}{c.status === "skipped" && " (skipped: input missing)"}</div>
-                    {c.findings.map((f, i) => <div key={i} className="finding"><span className="mono muted">{f.code}</span> {f.message}</div>)}
+                    {c.findings.map((f, i) => (
+                      <div key={i} className="finding">
+                        {f.relatedTo && <span className="badge b-warning">Supporting evidence · {f.relatedTo}</span>}{f.relatedTo && " "}
+                        <span className="mono muted">{f.code}</span> {f.message}
+                      </div>
+                    ))}
                   </div>
                 </li>
               ))}

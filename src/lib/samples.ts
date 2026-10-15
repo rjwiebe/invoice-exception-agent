@@ -66,7 +66,7 @@ const spec = (s: InvoiceSpec) => renderInvoice(s);
 
 export const SCENARIOS: Scenario[] = [
   {
-    id: "clean", title: "Clean match", expected: "Auto-cleared",
+    id: "clean", title: "Clean match", expected: "Auto-cleared for payment",
     blurb: "Northwind bills 10 valves at the PO price. Nothing to flag.",
     text: spec({ style: "A", vendor: "Northwind Industrial Supply Co.", number: "NW-88231", date: "2026-09-28", dueDays: 30, po: "PO-10021", lines: [{ desc: "HV-200 Hydraulic valve assembly", qty: 10, price: 450 }], taxRate: 0.07, bank: "4417" }),
   },
