@@ -128,6 +128,16 @@ describe("seven synthetic scenarios", () => {
     expect(inv.explanation).toBeNull();
   });
 
+  it("keeps the seeded price exception distinct from the selectable price scenario", async () => {
+    await ensureDemoSession(SESSION_A);
+    const starter = listInvoices(SESSION_A).find((invoice) => invoice.source === "synthetic demo fixture");
+    expect(starter?.extracted?.invoiceNumber).toBe("OF-1186");
+    const price = await submit(SESSION_A, "price");
+    expect(price.status).toBe("needs_review");
+    expect(codes(price)).toContain("PRICE_VARIANCE");
+    expect(codes(price)).not.toContain("DUPLICATE_INVOICE");
+  });
+
   it.each([
     ["price", "PRICE_VARIANCE"],
     ["duplicate", "DUPLICATE_INVOICE"],

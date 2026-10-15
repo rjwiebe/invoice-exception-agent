@@ -69,7 +69,11 @@ async function populateSession(sessionId: string, action: "demo.session_initiali
   }
   const starterReview = SCENARIOS.find((scenario) => scenario.id === "price");
   if (!starterReview) throw new Error("The seeded price-variance scenario is missing");
-  await submitInvoice(sessionId, starterReview.text, "synthetic demo fixture", mockProvider);
+  // Give the inbox fixture its own invoice number so the selectable price scenario
+  // demonstrates price variance rather than also looking like a duplicate.
+  const starterText = starterReview.text.replace("OF-1187", "OF-1186");
+  if (starterText === starterReview.text) throw new Error("The starter price fixture invoice number could not be made unique");
+  await submitInvoice(sessionId, starterText, "synthetic demo fixture", mockProvider);
 }
 
 async function initializeSession(sessionId: string): Promise<void> {
